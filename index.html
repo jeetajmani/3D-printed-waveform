@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waveform → STL</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0e0e0e;--s:#131313;--b:#1e1e1e;--t:#f0ece4;--m:#4a4a4a;--a:#00e5ff;--ok:#39ff14;--warn:#ff4d4d}
+body{background:var(--bg);color:var(--t);font-family:'IBM Plex Mono',monospace;min-height:100vh;display:flex;flex-direction:column}
+header{padding:1.1rem 2rem;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:1.5rem}
+.logo{font-size:.82rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--a)}
+.logo span{color:var(--m);font-weight:400}
+.sub{font-size:.57rem;color:var(--m);letter-spacing:.08em;border-left:1px solid var(--b);padding-left:1.4rem}
+.layout{display:grid;grid-template-columns:270px 1fr;flex:1;min-height:0}
+.panel{border-right:1px solid var(--b);padding:1.2rem;overflow-y:auto;display:flex;flex-direction:column;gap:1.1rem}
+.main{padding:1.5rem 2rem;display:flex;flex-direction:column;gap:1.2rem;overflow-y:auto}
+.sh{font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:var(--m);margin-bottom:.55rem;display:flex;align-items:center;gap:.5rem}
+.sh::after{content:'';flex:1;height:1px;background:var(--b)}
+.dz{border:1px dashed var(--b);padding:1.4rem .8rem;text-align:center;cursor:pointer;position:relative;transition:border-color .15s;background:var(--s)}
+.dz:hover,.dz.over{border-color:var(--a)}
+.dz input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz b{display:block;color:var(--t);font-weight:700;font-size:.75rem;margin-bottom:.25rem}
+.dz small{font-size:.6rem;color:var(--m)}
+.fname{font-size:.6rem;color:var(--ok);margin-top:.4rem;word-break:break-all;min-height:.8rem}
+.ctrl{display:flex;flex-direction:column;gap:.22rem;margin-bottom:.4rem}
+.cl{display:flex;justify-content:space-between;align-items:baseline;font-size:.6rem;color:var(--m)}
+.vv{font-size:.6rem;background:var(--s);border:1px solid var(--b);padding:.06rem .38rem;min-width:4rem;text-align:right;color:var(--t)}
+input[type=range]{-webkit-appearance:none;width:100%;height:1px;background:var(--b);outline:none;cursor:pointer;margin-top:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;background:var(--a);cursor:pointer}
+input[type=text]{width:100%;background:var(--s);border:1px solid var(--b);color:var(--t);font-family:'IBM Plex Mono',monospace;font-size:.75rem;padding:.4rem .5rem;outline:none;transition:border-color .15s;letter-spacing:.04em}
+input[type=text]:focus{border-color:var(--a)}
+input[type=text]::placeholder{color:var(--m)}
+label.tr{display:flex;align-items:center;gap:.5rem;font-size:.62rem;color:var(--m);padding:.18rem 0;cursor:pointer}
+label.tr input{accent-color:var(--a);width:12px;height:12px}
+select{width:100%;background:var(--s);border:1px solid var(--b);color:var(--t);font-family:'IBM Plex Mono',monospace;font-size:.62rem;padding:.35rem .5rem;outline:none;cursor:pointer}
+select:focus{border-color:var(--a)}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:.3rem}
+.sc{background:var(--s);border:1px solid var(--b);padding:.45rem .55rem}
+.sv{font-size:.82rem;font-weight:700;display:block}
+.sk{font-size:.48rem;color:var(--m);letter-spacing:.08em;text-transform:uppercase;margin-top:.1rem}
+.cc{background:var(--s);border:1px solid var(--b);overflow:hidden}
+.ct{font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:var(--m);padding:.45rem .8rem;border-bottom:1px solid var(--b)}
+canvas{display:block;width:100%}
+.btn{width:100%;padding:.8rem;background:var(--a);border:none;color:#000;font-family:'IBM Plex Mono',monospace;font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.btn:hover:not(:disabled){background:#00c8e0}
+.btn:disabled{opacity:.25;cursor:not-allowed;background:var(--b);color:var(--m)}
+.pg{height:2px;background:var(--b);overflow:hidden;display:none}
+.pg.vis{display:block}
+.pgb{height:100%;background:var(--a);width:0;transition:width .08s}
+.wb{font-size:.6rem;color:var(--warn);background:#160a0a;border:1px solid #2a1010;padding:.45rem .65rem;line-height:1.7;display:none;margin-top:.4rem}
+.wb.vis{display:block}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--b)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.spin{animation:pulse .9s infinite}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Waveform<span>::</span>STL</div>
+  <div class="sub">Audio → Binary STL · Backboard + Text · Bambu P1S · 0.4mm</div>
+</header>
+<div class="layout">
+
+<!-- ══ PANEL ══ -->
+<div class="panel">
+
+  <div>
+    <div class="sh">Audio</div>
+    <div class="dz" id="dz">
+      <input type="file" id="af" accept="audio/*">
+      <b>Drop audio file</b>
+      <small>MP3 · WAV · FLAC · OGG · M4A</small>
+      <div class="fname" id="fn"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sh">Board dimensions</div>
+    <div class="ctrl">
+      <div class="cl"><span>Width</span><span class="vv" id="o-pw">150 mm</span></div>
+      <input type="range" id="pw" min="50" max="300" value="150" step="5">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Board height</span><span class="vv" id="o-bh">60 mm</span></div>
+      <input type="range" id="bh" min="20" max="160" value="60" step="2">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Board thickness</span><span class="vv" id="o-bt">4.0 mm</span></div>
+      <input type="range" id="bt" min="1.2" max="12" value="4" step="0.4">
+    </div>
+  </div>
+
+  <div>
+    <div class="sh">Waveform</div>
+    <div class="ctrl">
+      <div class="cl"><span>Wave height</span><span class="vv" id="o-wh">25 mm</span></div>
+      <input type="range" id="wh" min="5" max="80" value="25" step="1">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Wave raise above board</span><span class="vv" id="o-wr">2.0 mm</span></div>
+      <input type="range" id="wr" min="0.4" max="8" value="2" step="0.4">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Depth (Y)</span><span class="vv" id="o-dp">4.0 mm</span></div>
+      <input type="range" id="dp" min="1.2" max="16" value="4" step="0.4">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Minimum height</span><span class="vv" id="o-mn">0.8 mm</span></div>
+      <input type="range" id="mn" min="0" max="4" value="0.8" step="0.4">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Vertical position</span><span class="vv" id="o-vp">50 %</span></div>
+      <input type="range" id="vp" min="10" max="90" value="50" step="1">
+    </div>
+    <label class="tr"><input type="checkbox" id="sym" checked><span>Symmetric (mirror ±)</span></label>
+    <label class="tr"><input type="checkbox" id="sm" checked><span>Smooth envelope</span></label>
+  </div>
+
+  <div>
+    <div class="sh">Text — top</div>
+    <div class="ctrl" style="margin-bottom:.3rem">
+      <input type="text" id="tt" placeholder="Top text (optional)" maxlength="30">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Font size</span><span class="vv" id="o-ts">6 mm</span></div>
+      <input type="range" id="ts" min="3" max="20" value="6" step="0.5">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Raise height</span><span class="vv" id="o-tr">1.2 mm</span></div>
+      <input type="range" id="tr" min="0.4" max="4" value="1.2" step="0.2">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Margin from edge</span><span class="vv" id="o-tm">4 mm</span></div>
+      <input type="range" id="tm" min="1" max="20" value="4" step="0.5">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Alignment</span></div>
+      <select id="ta"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select>
+    </div>
+  </div>
+
+  <div>
+    <div class="sh">Text — bottom</div>
+    <div class="ctrl" style="margin-bottom:.3rem">
+      <input type="text" id="tb" placeholder="Bottom text (optional)" maxlength="30">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Font size</span><span class="vv" id="o-bs">5 mm</span></div>
+      <input type="range" id="bs" min="3" max="20" value="5" step="0.5">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Raise height</span><span class="vv" id="o-br">1.2 mm</span></div>
+      <input type="range" id="br" min="0.4" max="4" value="1.2" step="0.2">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Margin from edge</span><span class="vv" id="o-bm">4 mm</span></div>
+      <input type="range" id="bm" min="1" max="20" value="4" step="0.5">
+    </div>
+    <div class="ctrl">
+      <div class="cl"><span>Alignment</span></div>
+      <select id="ba"><option value="center">Center</option><option value="left">Left</option><option value="right">Right</option></select>
+    </div>
+  </div>
+
+  <div>
+    <div class="sh">Resolution</div>
+    <div class="ctrl">
+      <div class="cl"><span>Samples (0=auto)</span><span class="vv" id="o-sr">auto</span></div>
+      <input type="range" id="sr" min="0" max="2000" value="0" step="50">
+    </div>
+  </div>
+
+  <div>
+    <div class="sh">Stats</div>
+    <div class="sg">
+      <div class="sc"><span class="sv" id="s-n">—</span><div class="sk">samples</div></div>
+      <div class="sc"><span class="sv" id="s-t">—</span><div class="sk">triangles</div></div>
+      <div class="sc"><span class="sv" id="s-w">—</span><div class="sk">width mm</div></div>
+      <div class="sc"><span class="sv" id="s-h">—</span><div class="sk">height mm</div></div>
+    </div>
+    <div class="wb" id="wb"></div>
+  </div>
+
+</div>
+
+<!-- ══ MAIN ══ -->
+<div class="main">
+  <div class="cc">
+    <div class="ct">Preview — front face (matches printed result)</div>
+    <canvas id="cv" height="320"></canvas>
+  </div>
+  <div class="pg" id="pg"><div class="pgb" id="pgb"></div></div>
+  <button class="btn" id="btn" disabled>↓ Generate &amp; Download STL</button>
+</div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════════
+const NOZZLE   = 0.4;
+const MIN_FEAT = 0.8;
+const LAYER_H  = 0.2;
+
+// ══════════════════════════════════════════════════════════════
+// VECTOR STROKE FONT
+// Each glyph is defined as an array of polylines [[x,y], ...]
+// Coordinates are in a 0-6 wide, 0-8 tall space.
+// ══════════════════════════════════════════════════════════════
+const FONT_W = 5, FONT_H = 8; // nominal glyph box
+
+const GLYPHS = {
+  ' ': [],
+  'A': [[[0,0],[2,8],[4,0]],[[0.8,3],[3.2,3]]],
+  'B': [[[0,0],[0,8],[2.5,8],[3.5,7],[3.5,5],[2.5,4],[0,4]],[[2.5,4],[3.5,3],[3.5,1],[2.5,0],[0,0]]],
+  'C': [[[4,7],[2,8],[1,8],[0,6],[0,2],[1,0],[2,0],[4,1]]],
+  'D': [[[0,0],[0,8],[2,8],[4,6],[4,2],[2,0],[0,0]]],
+  'E': [[[4,8],[0,8],[0,0],[4,0]],[[0,4],[3,4]]],
+  'F': [[[0,0],[0,8],[4,8]],[[0,4],[3,4]]],
+  'G': [[[4,7],[2,8],[0,7],[0,1],[2,0],[4,1],[4,4],[2,4]]],
+  'H': [[[0,0],[0,8]],[[4,0],[4,8]],[[0,4],[4,4]]],
+  'I': [[[1,0],[3,0]],[[2,0],[2,8]],[[1,8],[3,8]]],
+  'J': [[[0,2],[1,0],[3,0],[4,2],[4,8]],[[1,8],[3,8]]],
+  'K': [[[0,0],[0,8]],[[4,8],[0,4],[4,0]]],
+  'L': [[[0,8],[0,0],[4,0]]],
+  'M': [[[0,0],[0,8],[2,5],[4,8],[4,0]]],
+  'N': [[[0,0],[0,8],[4,0],[4,8]]],
+  'O': [[[1,0],[0,1],[0,7],[1,8],[3,8],[4,7],[4,1],[3,0],[1,0]]],
+  'P': [[[0,0],[0,8],[3,8],[4,7],[4,5],[3,4],[0,4]]],
+  'Q': [[[1,0],[0,1],[0,7],[1,8],[3,8],[4,7],[4,1],[3,0],[1,0]],[[2.5,2],[4,0]]],
+  'R': [[[0,0],[0,8],[3,8],[4,7],[4,5],[3,4],[0,4]],[[2,4],[4,0]]],
+  'S': [[[4,7],[2,8],[0,7],[0,5],[4,3],[4,1],[2,0],[0,1]]],
+  'T': [[[0,8],[4,8]],[[2,8],[2,0]]],
+  'U': [[[0,8],[0,2],[1,0],[3,0],[4,2],[4,8]]],
+  'V': [[[0,8],[2,0],[4,8]]],
+  'W': [[[0,8],[1,0],[2,4],[3,0],[4,8]]],
+  'X': [[[0,8],[4,0]],[[4,8],[0,0]]],
+  'Y': [[[0,8],[2,4],[4,8]],[[2,4],[2,0]]],
+  'Z': [[[0,8],[4,8],[0,0],[4,0]]],
+  '0': [[[1,0],[0,2],[0,6],[1,8],[3,8],[4,6],[4,2],[3,0],[1,0]],[[0,7],[4,1]]],
+  '1': [[[1,6],[2,8],[2,0]],[[0,0],[4,0]]],
+  '2': [[[0,6],[1,8],[3,8],[4,6],[4,5],[0,1],[0,0],[4,0]]],
+  '3': [[[0,7],[1,8],[3,8],[4,7],[4,5],[2,4],[4,3],[4,1],[3,0],[1,0],[0,1]]],
+  '4': [[[3,0],[3,8],[0,4],[4,4]]],
+  '5': [[[4,8],[0,8],[0,4],[3,4],[4,3],[4,1],[3,0],[0,0]]],
+  '6': [[[3,8],[1,8],[0,6],[0,1],[1,0],[3,0],[4,1],[4,3],[3,4],[0,4]]],
+  '7': [[[0,8],[4,8],[2,0]]],
+  '8': [[[1,4],[0,5],[0,7],[1,8],[3,8],[4,7],[4,5],[1,4],[0,3],[0,1],[1,0],[3,0],[4,1],[4,3],[1,4]]],
+  '9': [[[1,0],[3,0],[4,1],[4,7],[3,8],[1,8],[0,7],[0,5],[1,4],[4,4]]],
+  '.': [[[1.5,0],[2.5,0],[2.5,1],[1.5,1],[1.5,0]]],
+  ',': [[[2,1],[1.5,0],[2,0],[2.5,0.5]]],
+  '!': [[[2,2],[2,8]],[[1.5,0],[2.5,0],[2.5,1],[1.5,1],[1.5,0]]],
+  '?': [[[0,6],[1,8],[3,8],[4,7],[4,5],[2,3],[2,2]],[[1.5,0],[2.5,0],[2.5,1],[1.5,1],[1.5,0]]],
+  '-': [[[0.5,4],[3.5,4]]],
+  '_': [[[0,0],[4,0]]],
+  "'": [[[1.5,7],[2,8],[2.5,7]]],
+  ':': [[[1.5,5],[2.5,5],[2.5,6],[1.5,6],[1.5,5]],[[1.5,2],[2.5,2],[2.5,3],[1.5,3],[1.5,2]]],
+  '/': [[[3.5,8],[0.5,0]]],
+  '&': [[[4,2],[3,0],[1,0],[0,2],[0,3],[4,7],[4,8],[2,8],[0,6],[0,5],[4,1]]],
+};
+
+// Measure text width in mm given font size
+function textWidth(str, fontSize) {
+  const scale = fontSize / FONT_H;
+  const charW = (FONT_W + 1) * scale; // +1 for spacing
+  return str.length * charW - scale; // no trailing space
+}
+
+// Build stroke-based text geometry: array of {path: [[x,y]...]} in mm
+// Origin is bottom-left of text baseline
+function getTextStrokes(str, fontSize) {
+  const scale = fontSize / FONT_H;
+  const charW = (FONT_W + 1) * scale;
+  const strokes = [];
+  let cx = 0;
+  for (const ch of str.toUpperCase()) {
+    const g = GLYPHS[ch] || GLYPHS[' '];
+    for (const poly of g) {
+      strokes.push(poly.map(([x, y]) => [cx + x * scale, y * scale]));
+    }
+    cx += charW;
+  }
+  return strokes;
+}
+
+// ══════════════════════════════════════════════════════════════
+// STL GEOMETRY HELPERS
+// ══════════════════════════════════════════════════════════════
+const TRIS = [];
+
+function tri(ax,ay,az, bx,by,bz, cx,cy,cz) {
+  let ux=bx-ax,uy=by-ay,uz=bz-az, vx=cx-ax,vy=cy-ay,vz=cz-az;
+  let nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+  const l=Math.sqrt(nx*nx+ny*ny+nz*nz);
+  if(l>1e-9){nx/=l;ny/=l;nz/=l;}
+  TRIS.push(nx,ny,nz,ax,ay,az,bx,by,bz,cx,cy,cz);
+}
+
+// Axis-aligned box: origin at (x0,y0,z0), size (w,d,h)
+function addBox(x0,y0,z0, w,d,h) {
+  const x1=x0+w, y1=y0+d, z1=z0+h;
+  // bottom
+  tri(x0,y0,z0, x1,y1,z0, x1,y0,z0);
+  tri(x0,y0,z0, x0,y1,z0, x1,y1,z0);
+  // top
+  tri(x0,y0,z1, x1,y0,z1, x1,y1,z1);
+  tri(x0,y0,z1, x1,y1,z1, x0,y1,z1);
+  // front (y=y0)
+  tri(x0,y0,z0, x1,y0,z0, x1,y0,z1);
+  tri(x0,y0,z0, x1,y0,z1, x0,y0,z1);
+  // back (y=y1)
+  tri(x0,y1,z0, x1,y1,z1, x1,y1,z0);
+  tri(x0,y1,z0, x0,y1,z1, x1,y1,z1);
+  // left (x=x0)
+  tri(x0,y0,z0, x0,y0,z1, x0,y1,z1);
+  tri(x0,y0,z0, x0,y1,z1, x0,y1,z0);
+  // right (x=x1)
+  tri(x1,y0,z0, x1,y1,z1, x1,y0,z1);
+  tri(x1,y0,z0, x1,y1,z0, x1,y1,z1);
+}
+
+// Extruded stroke polyline — each segment becomes a flat rectangular prism
+// stroke width = sw mm, extrude height = eh mm on top of base z=bz
+function addStrokeText(strokes, sw, eh, bz, depth) {
+  for (const poly of strokes) {
+    for (let i = 0; i < poly.length - 1; i++) {
+      const [ax, ay] = poly[i], [bx, by] = poly[i+1];
+      const dx = bx-ax, dy = by-ay;
+      const len = Math.sqrt(dx*dx+dy*dy);
+      if (len < 0.001) continue;
+      // perpendicular
+      const px = -dy/len * sw/2, py = dx/len * sw/2;
+      // 4 corners of the segment rect in XZ plane (Y is depth)
+      const x0=ax+px, z0=ay+py, x1=ax-px, z1=ay-py;
+      const x2=bx-px, z2=by-py, x3=bx+px, z3=by+py;
+      // extrude from bz to bz+eh along Y axis (depth direction)
+      // This creates a thick slab oriented in X-Z with depth in Y
+      for (let y0=0, y1=depth; y0 < depth+0.001; ) {
+        const Y0=0, Y1=depth;
+        // top face (y=Y0 side, outward = front face)
+        tri(x0,Y0,bz+z0, x3,Y0,bz+z3, x2,Y0,bz+z2);
+        tri(x0,Y0,bz+z0, x2,Y0,bz+z2, x1,Y0,bz+z1);
+        // bottom face (y=Y1 side)
+        tri(x0,Y1,bz+z0, x2,Y1,bz+z2, x3,Y1,bz+z3);
+        tri(x0,Y1,bz+z0, x1,Y1,bz+z1, x2,Y1,bz+z2);
+        break;
+      }
+      // For each edge of the quad, add side walls
+      const quad = [[x0,z0],[x3,z3],[x2,z2],[x1,z1]];
+      for (let q = 0; q < 4; q++) {
+        const [qx0,qz0] = quad[q], [qx1,qz1] = quad[(q+1)%4];
+        const Y0=0, Y1=depth;
+        tri(qx0,Y0,bz+qz0, qx1,Y1,bz+qz1, qx0,Y1,bz+qz0);
+        tri(qx0,Y0,bz+qz0, qx1,Y0,bz+qz1, qx1,Y1,bz+qz1);
+      }
+    }
+    // Add round caps at each endpoint
+    const first = poly[0], last = poly[poly.length-1];
+    for (const [px,py] of [first, last]) {
+      addBox(px-sw/2, 0, bz+py-sw/2, sw, depth, sw);
+    }
+  }
+}
+
+// Waveform solid — columns from z=0 up to tops[i], full Y depth
+function addWaveform(tops, printW, depth, offX, offZ) {
+  const n = tops.length;
+  const colW = printW / n;
+  const Y0 = 0, Y1 = depth;
+
+  // Bottom
+  tri(offX,Y0,offZ, offX+printW,Y1,offZ, offX+printW,Y0,offZ);
+  tri(offX,Y0,offZ, offX,Y1,offZ,        offX+printW,Y1,offZ);
+
+  // Left cap
+  tri(offX,Y0,offZ, offX,Y0,offZ+tops[0], offX,Y1,offZ+tops[0]);
+  tri(offX,Y0,offZ, offX,Y1,offZ+tops[0], offX,Y1,offZ);
+
+  // Right cap
+  const tR=tops[n-1];
+  tri(offX+printW,Y0,offZ, offX+printW,Y1,offZ+tR, offX+printW,Y0,offZ+tR);
+  tri(offX+printW,Y0,offZ, offX+printW,Y1,offZ,    offX+printW,Y1,offZ+tR);
+
+  // Front face (y=Y0)
+  for (let i = 0; i < n; i++) {
+    const x0=offX+i*colW, x1=offX+(i+1)*colW;
+    const z0=tops[i], z1=i<n-1?tops[i+1]:tops[n-1];
+    tri(x0,Y0,offZ,   x1,Y0,offZ,   x0,Y0,offZ+z0);
+    if (i < n-1) tri(x1,Y0,offZ, x1,Y0,offZ+z1, x0,Y0,offZ+z0);
+  }
+
+  // Back face (y=Y1)
+  for (let i = 0; i < n; i++) {
+    const x0=offX+i*colW, x1=offX+(i+1)*colW;
+    const z0=tops[i], z1=i<n-1?tops[i+1]:tops[n-1];
+    tri(x0,Y1,offZ, x0,Y1,offZ+z0, x1,Y1,offZ);
+    if (i < n-1) tri(x1,Y1,offZ, x0,Y1,offZ+z0, x1,Y1,offZ+z1);
+  }
+
+  // Top surface strip
+  for (let i = 0; i < n-1; i++) {
+    const x0=offX+i*colW, x1=offX+(i+1)*colW;
+    const z0=tops[i], z1=tops[i+1];
+    tri(x0,Y0,offZ+z0, x1,Y0,offZ+z1, x0,Y1,offZ+z0);
+    tri(x1,Y0,offZ+z1, x1,Y1,offZ+z1, x0,Y1,offZ+z0);
+  }
+  // Last column flat top
+  {
+    const x0=offX+(n-1)*colW;
+    tri(x0,Y0,offZ+tops[n-1], offX+printW,Y0,offZ+tops[n-1], x0,Y1,offZ+tops[n-1]);
+    tri(offX+printW,Y0,offZ+tops[n-1], offX+printW,Y1,offZ+tops[n-1], x0,Y1,offZ+tops[n-1]);
+  }
+}
+
+function toSTLBlob() {
+  const nT  = TRIS.length / 12;
+  const buf = new ArrayBuffer(80 + 4 + nT * 50);
+  const dv  = new DataView(buf);
+  const hdr = 'Waveform3D STL';
+  for (let i=0;i<80;i++) dv.setUint8(i, i<hdr.length?hdr.charCodeAt(i):0);
+  dv.setUint32(80, nT, true);
+  let off = 84;
+  for (let t=0;t<nT;t++) {
+    const b=t*12;
+    for (let f=0;f<12;f++){dv.setFloat32(off,TRIS[b+f],true);off+=4;}
+    dv.setUint16(off,0,true);off+=2;
+  }
+  return new Blob([buf],{type:'model/stl'});
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUDIO
+// ══════════════════════════════════════════════════════════════
+let RAW = null;
+
+async function loadAudio(file) {
+  const fn=id('fn'); fn.textContent='⟳  analysing…'; fn.classList.add('spin');
+  try {
+    const ab=await file.arrayBuffer();
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const buf=await ac.decodeAudioData(ab); await ac.close();
+    const BINS=8000, nCh=buf.numberOfChannels, bsz=Math.floor(buf.length/BINS);
+    const out=new Float32Array(BINS);
+    for (let i=0;i<BINS;i++) {
+      let s2=0;
+      for (let c=0;c<nCh;c++){const ch=buf.getChannelData(c),o=i*bsz;for(let j=0;j<bsz;j++){const v=ch[o+j];s2+=v*v;}}
+      out[i]=Math.sqrt(s2/(bsz*nCh));
+    }
+    let mx=0; for(let i=0;i<BINS;i++) if(out[i]>mx) mx=out[i]; if(mx<1e-9)mx=1;
+    for(let i=0;i<BINS;i++) out[i]/=mx;
+    RAW=out;
+    fn.textContent='✓  '+file.name; fn.classList.remove('spin');
+    id('btn').disabled=false;
+    redraw();
+  } catch(e){fn.textContent='✗  '+e.message;fn.classList.remove('spin');}
+}
+
+function maxPool(data, n) {
+  const f=data.length/n, out=new Float32Array(n);
+  for(let i=0;i<n;i++){const lo=Math.floor(i*f),hi=Math.min(Math.ceil((i+1)*f),data.length);let mx=0;for(let j=lo;j<hi;j++)if(data[j]>mx)mx=data[j];out[i]=mx;}
+  let m=0;for(let i=0;i<n;i++)if(out[i]>m)m=out[i];if(m<1e-9)m=1;for(let i=0;i<n;i++)out[i]/=m;
+  return out;
+}
+
+function gaussSmooth(data,r){
+  if(r<1)return data;
+  const out=new Float32Array(data.length),k=[]; let ks=0;
+  for(let i=-r;i<=r;i++){const w=Math.exp(-(i*i)/(r*r*0.5));k.push(w);ks+=w;}
+  for(let i=0;i<data.length;i++){let v=0;for(let j=0;j<k.length;j++){const ii=Math.max(0,Math.min(data.length-1,i+j-r));v+=data[ii]*k[j];}out[i]=v/ks;}
+  return out;
+}
+
+function snapL(mm){return Math.max(LAYER_H,Math.round(mm/LAYER_H)*LAYER_H);}
+
+function id(x){return document.getElementById(x);}
+function pN(x){return parseFloat(id(x).value);}
+function pB(x){return id(x).checked;}
+function pS(x){return id(x).value;}
+
+function getCfg() {
+  return {
+    printW: pN('pw'),
+    boardH: pN('bh'),
+    boardT: pN('bt'),
+    waveH:  pN('wh'),
+    waveR:  pN('wr'),   // raise above board surface
+    depth:  pN('dp'),
+    minH:   pN('mn'),
+    wavePct:pN('vp')/100,
+    sym:    pB('sym'),
+    doSm:   pB('sm'),
+    manS:   pN('sr'),
+    topTxt: pS('tt'),
+    topSz:  pN('ts'),
+    topRaise:pN('tr'),
+    topMargin:pN('tm'),
+    topAlign: pS('ta'),
+    botTxt: pS('tb'),
+    botSz:  pN('bs'),
+    botRaise:pN('br'),
+    botMargin:pN('bm'),
+    botAlign: pS('ba'),
+  };
+}
+
+function getEnvelope(cfg) {
+  if (!RAW) return null;
+  const autoS = Math.max(10, Math.floor(cfg.printW / MIN_FEAT));
+  const n = cfg.manS > 0 ? cfg.manS : autoS;
+  let env = maxPool(RAW, n);
+  if (cfg.doSm) env = gaussSmooth(env, 2);
+  return env;
+}
+
+// ══════════════════════════════════════════════════════════════
+// PREVIEW
+// ══════════════════════════════════════════════════════════════
+function redraw() {
+  const cfg = getCfg();
+  const env = getEnvelope(cfg);
+  const canvas = id('cv');
+  const CW = canvas.parentElement.clientWidth;
+  canvas.width = CW; canvas.height = 320;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,CW,320);
+
+  // Background
+  ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,CW,320);
+
+  const { printW, boardH, boardT, waveH, waveR, depth, minH, wavePct,
+          sym, topTxt, topSz, topRaise, topMargin, topAlign,
+          botTxt, botSz, botRaise, botMargin, botAlign } = cfg;
+
+  // Scale: fit printW into CW with padding
+  const PAD = 20;
+  const scale = (CW - PAD*2) / printW;
+  const CH = boardH * scale;
+
+  // Board outline
+  const bx = PAD, by = (320 - CH) / 2;
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(bx, by, printW*scale, CH);
+  ctx.strokeStyle = '#2a3a5e';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx, by, printW*scale, CH);
+
+  // Wave center position
+  const waveCenterY = by + CH * (1 - wavePct); // from top
+
+  // Draw waveform silhouette
+  if (env) {
+    const n = env.length;
+    const totalWaveH = waveH * scale;
+    const waveActualH = (waveH - minH) * scale;
+
+    ctx.beginPath();
+    if (sym) {
+      ctx.moveTo(bx, waveCenterY);
+      for (let i=0;i<n;i++) {
+        const hPx = Math.max(minH*scale, env[i]*waveActualH + minH*scale);
+        ctx.lineTo(bx + (i+0.5)*(printW*scale/n), waveCenterY - hPx);
+      }
+      ctx.lineTo(bx + printW*scale, waveCenterY);
+      for (let i=n-1;i>=0;i--) {
+        const hPx = Math.max(minH*scale, env[i]*waveActualH + minH*scale);
+        ctx.lineTo(bx + (i+0.5)*(printW*scale/n), waveCenterY + hPx);
+      }
+    } else {
+      ctx.moveTo(bx, waveCenterY);
+      for (let i=0;i<n;i++) {
+        const hPx = Math.max(minH*scale, env[i]*waveActualH + minH*scale);
+        ctx.lineTo(bx + (i+0.5)*(printW*scale/n), waveCenterY - hPx);
+      }
+      ctx.lineTo(bx + printW*scale, waveCenterY);
+    }
+    ctx.closePath();
+    const g = ctx.createLinearGradient(0, waveCenterY-totalWaveH, 0, waveCenterY+totalWaveH);
+    g.addColorStop(0,'#1e3a6e'); g.addColorStop(0.5,'#0d1f40'); g.addColorStop(1,'#1e3a6e');
+    ctx.fillStyle=g; ctx.fill();
+    ctx.strokeStyle='rgba(80,150,255,0.3)'; ctx.lineWidth=0.7; ctx.stroke();
+  } else {
+    ctx.fillStyle='#1e2a3a';
+    const wH = 20;
+    ctx.fillRect(bx, waveCenterY-wH/2, printW*scale, wH);
+    ctx.fillStyle='#2a3a5a'; ctx.font='11px IBM Plex Mono'; ctx.textAlign='center';
+    ctx.fillText('load audio', bx+printW*scale/2, waveCenterY+4);
+  }
+
+  // Draw text previews
+  function drawTextPreview(txt, fontSize, margin, align, fromTop) {
+    if (!txt) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(240,236,228,0.85)';
+    const fs = Math.max(6, fontSize * scale * 0.9);
+    ctx.font = `bold ${fs}px IBM Plex Mono`;
+    const tw = ctx.measureText(txt).width;
+    let tx;
+    if (align==='center') tx = bx + printW*scale/2 - tw/2;
+    else if (align==='left') tx = bx + margin*scale;
+    else tx = bx + printW*scale - margin*scale - tw;
+    const ty = fromTop ? by + margin*scale + fs : by + CH - margin*scale;
+    ctx.fillText(txt, tx, ty);
+    ctx.restore();
+  }
+
+  drawTextPreview(topTxt, topSz, topMargin, topAlign, true);
+  drawTextPreview(botTxt, botSz, botMargin, botAlign, false);
+
+  // Update stats
+  const n = env ? env.length : 0;
+  id('s-n').textContent = n || '—';
+  id('s-t').textContent = n ? '~'+(n*10+100).toLocaleString() : '—';
+  id('s-w').textContent = printW;
+  id('s-h').textContent = boardH;
+  id('o-sr').textContent = n ? n+(cfg.manS===0?' (auto)':'') : '—';
+
+  const colW = n ? printW/n : 0;
+  const warns=[];
+  if(n && colW<NOZZLE) warns.push(`⚠ Column ${colW.toFixed(2)}mm < nozzle width`);
+  else if(n && colW<MIN_FEAT) warns.push(`△ Column ${colW.toFixed(2)}mm = 1 wall — increase width or reduce samples`);
+  const wb=id('wb'); wb.innerHTML=warns.join('<br>'); warns.length?wb.classList.add('vis'):wb.classList.remove('vis');
+}
+
+// ══════════════════════════════════════════════════════════════
+// BUILD STL
+// ══════════════════════════════════════════════════════════════
+function buildSTL(env, cfg) {
+  TRIS.length = 0; // clear
+
+  const { printW, boardH, boardT, waveH, waveR, depth, minH, wavePct,
+          sym, topTxt, topSz, topRaise, topMargin, topAlign,
+          botTxt, botSz, botRaise, botMargin, botAlign } = cfg;
+
+  // ── BACKBOARD ──
+  // Flat rectangular slab: X[0..printW], Y[0..depth], Z[0..boardT]
+  addBox(0, 0, 0,  printW, depth, boardT);
+
+  // ── WAVEFORM ──
+  const n = env.length;
+  const colW = printW / n;
+  const waveActualH = waveH - minH;
+
+  // waveform center Z position on board
+  const waveCenterZ = boardT + (boardH - boardT) * wavePct;
+
+  const tops = new Float32Array(n);
+  for (let i=0;i<n;i++) {
+    const hMM = snapL(Math.max(minH, env[i] * waveActualH + minH));
+    tops[i] = hMM;
+  }
+
+  if (sym) {
+    // Symmetric: wave extends ± from waveCenterZ
+    // We build two waveform solids — top half and bottom half (mirrored)
+    // Top half: sits from waveCenterZ upward
+    addWaveform(tops, printW, depth, 0, waveCenterZ);
+    // Bottom half: flip Z, sits from waveCenterZ downward
+    const topsFlip = new Float32Array(n);
+    for (let i=0;i<n;i++) topsFlip[i] = tops[i];
+    // For bottom half: build waveform pointing downward
+    // We can do this by building a separate inverted solid
+    addWaveformDown(tops, printW, depth, 0, waveCenterZ);
+  } else {
+    // Asymmetric: wave rises from waveCenterZ upward
+    addWaveform(tops, printW, depth, 0, waveCenterZ);
+  }
+
+  // ── TEXT ──
+  const SW = 0.6; // stroke width in mm
+
+  function placeText(txt, fontSize, raise, margin, align, zPos) {
+    if (!txt) return;
+    const strokes = getTextStrokes(txt, fontSize);
+    const tw = textWidth(txt, fontSize);
+    let xOff;
+    if (align==='center') xOff = (printW - tw) / 2;
+    else if (align==='left') xOff = margin;
+    else xOff = printW - margin - tw;
+
+    // Shift strokes by xOff
+    const shifted = strokes.map(poly => poly.map(([x,y]) => [x+xOff, y]));
+    addStrokeText(shifted, SW, raise, boardT, depth);
+  }
+
+  // Top text: positioned near top of board
+  const topTextZ = boardT + boardH - boardT - topSz - topMargin;
+  placeText(topTxt, topSz, topRaise, topMargin, topAlign, topTextZ);
+
+  // Bottom text: positioned near bottom of board
+  const botTextZ = boardT + botMargin;
+  placeText(botTxt, botSz, botRaise, botMargin, botAlign, botTextZ);
+
+  return toSTLBlob();
+}
+
+// Waveform pointing downward from zBase
+function addWaveformDown(tops, printW, depth, offX, zBase) {
+  const n = tops.length;
+  const colW = printW / n;
+  const Y0=0, Y1=depth;
+
+  const bottoms = new Float32Array(n);
+  for (let i=0;i<n;i++) bottoms[i] = zBase - tops[i]; // bottom z of each col
+
+  // Top face (at zBase)
+  tri(offX,Y0,zBase, offX+printW,Y0,zBase, offX+printW,Y1,zBase);
+  tri(offX,Y0,zBase, offX+printW,Y1,zBase, offX,Y1,zBase);
+
+  // Left cap
+  tri(offX,Y0,zBase, offX,Y1,bottoms[0], offX,Y0,bottoms[0]);
+  tri(offX,Y0,zBase, offX,Y1,zBase,      offX,Y1,bottoms[0]);
+
+  // Right cap
+  tri(offX+printW,Y0,zBase, offX+printW,Y0,bottoms[n-1], offX+printW,Y1,bottoms[n-1]);
+  tri(offX+printW,Y0,zBase, offX+printW,Y1,bottoms[n-1], offX+printW,Y1,zBase);
+
+  // Front face
+  for (let i=0;i<n;i++) {
+    const x0=offX+i*colW, x1=offX+(i+1)*colW;
+    const z0=bottoms[i], z1=i<n-1?bottoms[i+1]:bottoms[n-1];
+    tri(x0,Y0,zBase, x0,Y0,z0, x1,Y0,zBase);
+    if (i<n-1) tri(x1,Y0,zBase, x0,Y0,z0, x1,Y0,z1);
+  }
+
+  // Back face
+  for (let i=0;i<n;i++) {
+    const x0=offX+i*colW, x1=offX+(i+1)*colW;
+    const z0=bottoms[i], z1=i<n-1?bottoms[i+1]:bottoms[n-1];
+    tri(x0,Y1,zBase, x1,Y1,zBase, x0,Y1,z0);
+    if (i<n-1) tri(x1,Y1,zBase, x1,Y1,z1, x0,Y1,z0);
+  }
+
+  // Bottom surface strip
+  for (let i=0;i<n-1;i++) {
+    const x0=offX+i*colW, x1=offX+(i+1)*colW;
+    const z0=bottoms[i], z1=bottoms[i+1];
+    tri(x0,Y0,z0, x0,Y1,z0, x1,Y0,z1);
+    tri(x1,Y0,z1, x0,Y1,z0, x1,Y1,z1);
+  }
+  // Last col bottom
+  {
+    const x0=offX+(n-1)*colW;
+    tri(x0,Y0,bottoms[n-1], x0,Y1,bottoms[n-1], offX+printW,Y0,bottoms[n-1]);
+    tri(offX+printW,Y0,bottoms[n-1], x0,Y1,bottoms[n-1], offX+printW,Y1,bottoms[n-1]);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// EVENTS
+// ══════════════════════════════════════════════════════════════
+const dz=id('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files[0])loadAudio(e.dataTransfer.files[0]);});
+id('af').addEventListener('change',e=>{if(e.target.files[0])loadAudio(e.target.files[0]);});
+
+[['pw','o-pw',v=>`${v} mm`],['bh','o-bh',v=>`${v} mm`],['bt','o-bt',v=>`${v} mm`],
+ ['wh','o-wh',v=>`${v} mm`],['wr','o-wr',v=>`${v} mm`],['dp','o-dp',v=>`${v} mm`],
+ ['mn','o-mn',v=>`${v} mm`],['vp','o-vp',v=>`${v} %`],
+ ['ts','o-ts',v=>`${v} mm`],['tr','o-tr',v=>`${v} mm`],['tm','o-tm',v=>`${v} mm`],
+ ['bs','o-bs',v=>`${v} mm`],['br','o-br',v=>`${v} mm`],['bm','o-bm',v=>`${v} mm`],
+].forEach(([s,o,f])=>{ id(s).addEventListener('input',()=>{id(o).textContent=f(id(s).value);redraw();}); });
+
+['sr','sym','sm','tt','tb','ta','ba'].forEach(s=>{
+  id(s).addEventListener('input',redraw);
+  id(s).addEventListener('change',redraw);
+});
+
+id('btn').addEventListener('click', async ()=>{
+  if(!RAW) return;
+  const btn=id('btn'); btn.disabled=true; btn.textContent='⟳  building mesh…';
+  const pg=id('pg'),pgb=id('pgb'); pg.classList.add('vis'); pgb.style.width='20%';
+  await new Promise(r=>setTimeout(r,16));
+  const cfg=getCfg(); const env=getEnvelope(cfg);
+  pgb.style.width='60%'; await new Promise(r=>setTimeout(r,16));
+  const blob=buildSTL(env,cfg);
+  pgb.style.width='100%'; await new Promise(r=>setTimeout(r,80));
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='waveform3d.stl'; a.click(); URL.revokeObjectURL(a.href);
+  pgb.style.width='0'; pg.classList.remove('vis');
+  btn.disabled=false; btn.textContent='↓ Generate & Download STL';
+});
+
+window.addEventListener('resize',redraw);
+redraw();
+</script>
+</body>
+</html>
